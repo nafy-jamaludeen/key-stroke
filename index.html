@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Keystroke ID — typing rhythm authentication</title>
+<style>
+  @font-face { font-family: 'Space Grotesk'; src: local('Space Grotesk'); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0B0E14;
+    color: #E8E6E1;
+    font-family: 'Inter', -apple-system, sans-serif;
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .sub { color: #8A8578; font-size: 14px; margin-top: 6px; margin-bottom: 36px; }
+  .panel {
+    background: #11151D;
+    border: 1px solid #1E2330;
+    border-radius: 10px;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5B8C7B;
+    margin-bottom: 16px;
+  }
+  input[type=password], input[type=text] {
+    width: 100%;
+    background: #0B0E14;
+    border: 1px solid #2A3040;
+    border-radius: 6px;
+    color: #E8E6E1;
+    font-size: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 12px 14px;
+    outline: none;
+  }
+  input:focus { border-color: #5B8C7B; }
+  .row { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+  button {
+    background: #1A2E27;
+    color: #8FCBB5;
+    border: 1px solid #2D4A40;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 18px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  button:hover { background: #213B32; }
+  button.secondary { background: transparent; color: #8A8578; border-color: #2A3040; }
+  button.secondary:hover { background: #161B26; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .dots { display: flex; gap: 6px; margin-top: 14px; }
+  .dot { width: 24px; height: 4px; border-radius: 2px; background: #1E2330; }
+  .dot.filled { background: #5B8C7B; }
+  .status-line { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-size: 13px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.ok { background: #5B8C7B; }
+  .status-dot.warn { background: #C9A24A; }
+  .status-dot.bad { background: #C4604A; }
+  .status-text { font-family: 'JetBrains Mono', monospace; }
+  .score-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 18px; }
+  .score-num { font-family: 'JetBrains Mono', monospace; font-size: 36px; font-weight: 500; }
+  .score-label { font-size: 12px; color: #8A8578; text-transform: uppercase; letter-spacing: 0.06em; }
+  .fp-layout { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; align-items: center; }
+  @media (max-width: 560px) { .fp-layout { grid-template-columns: 1fr; } }
+  .fp-readout { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8A8578; }
+  .fp-readout .fp-row { display: flex; justify-content: space-between; padding: 7px 0; border-top: 1px solid #1A1F2A; }
+  .fp-readout .fp-row:first-child { border-top: none; }
+  .fp-readout .fp-key { color: #6F6D64; }
+  .fp-readout .fp-val { color: #C7C5BC; }
+  .fp-legend { display: flex; gap: 18px; margin-top: 14px; font-size: 12px; color: #8A8578; }
+  .fp-legend .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .drift-log { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8A8578; margin-top: 14px; max-height: 120px; overflow-y: auto; }
+  .drift-log div { padding: 4px 0; border-top: 1px solid #1A1F2A; display: flex; justify-content: space-between; }
+  .badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+  .badge.ok { background: #15251E; color: #6FA98E; }
+  .badge.bad { background: #2A1611; color: #D17B61; }
+  .reset-link { font-size: 12px; color: #5C5A52; text-decoration: underline; cursor: pointer; margin-top: 8px; display: inline-block; }
+  .hint { font-size: 12px; color: #5C5A52; margin-top: 10px; line-height: 1.6; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab { padding: 8px 16px; font-size: 13px; border-radius: 6px; cursor: pointer; color: #8A8578; }
+  .tab.active { background: #1A2E27; color: #8FCBB5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Keystroke ID</h1>
+  <div class="sub">Authentication by typing rhythm, not just what you type</div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-enroll" onclick="showTab('enroll')">Enroll</div>
+    <div class="tab" id="tab-auth" onclick="showTab('auth')">Authenticate</div>
+    <div class="tab" id="tab-fingerprint" onclick="showTab('fingerprint')">Fingerprint</div>
+  </div>
+
+  <!-- ENROLL -->
+  <div id="view-enroll">
+    <div class="panel">
+      <div class="panel-label">Step 1 — set a password</div>
+      <input type="text" id="enroll-password-display" placeholder="Choose any password, e.g. river-stone-9" />
+      <div class="hint">This is the password you'll type to log in. Anyone who knows it can still try — what matters is whether they type it like you do.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">Step 2 — type it 5 times to learn your rhythm</div>
+      <input type="password" id="enroll-input" placeholder="Type your password here" disabled />
+      <div class="dots" id="enroll-dots"></div>
+      <div class="status-line">
+        <div class="status-dot" id="enroll-status-dot" style="background:#2A3040"></div>
+        <span class="status-text" id="enroll-status-text">Set a password above to begin</span>
+      </div>
+      <div class="row">
+        <button class="secondary" onclick="resetEnrollment()">Reset profile</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTH -->
+  <div id="view-auth" style="display:none">
+    <div class="panel">
+      <div class="panel-label">Type your password to unlock</div>
+      <input type="password" id="auth-input" placeholder="Type your password" />
+      <div class="score-row">
+        <div>
+          <div class="score-label">Match confidence</div>
+          <div class="score-num" id="auth-score" style="color:#8A8578">—</div>
+        </div>
+        <div style="text-align:right">
+          <div class="score-label">Decision</div>
+          <div class="status-line" style="margin-top:4px">
+            <div class="status-dot" id="auth-status-dot"></div>
+            <span class="status-text" id="auth-status-text">Waiting</span>
+          </div>
+        </div>
+      </div>
+      <div class="hint" id="auth-hint">Correct password + your rhythm → unlock. Correct password, wrong rhythm → blocked, even though the text matched.</div>
+    </div>
+
+    <div class="panel" id="drift-panel" style="display:none">
+      <div class="panel-label">Drift tracking — how your rhythm has shifted over recent attempts</div>
+      <div class="drift-log" id="drift-log"></div>
+    </div>
+  </div>
+
+  <!-- FINGERPRINT -->
+  <div id="view-fingerprint" style="display:none">
+    <div class="panel">
+      <div class="panel-label">Your typing fingerprint</div>
+      <div class="fp-layout">
+        <svg id="fp-overlay" viewBox="0 0 320 320" width="100%"></svg>
+        <div class="fp-readout" id="fp-readout"></div>
+      </div>
+      <div class="fp-legend">
+        <span><span class="swatch" style="background:#5B8C7B"></span>enrolled baseline</span>
+        <span><span class="swatch" style="background:#C9A24A"></span>most recent attempt</span>
+      </div>
+      <div class="hint">Each axis is one key in your password, in order. Distance from center is how long you held that key or paused before it, relative to your own average — so the shape is your rhythm, not the password text.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const STORAGE_KEY_PROFILE = 'keystroke-id-profile';
+const STORAGE_KEY_HISTORY = 'keystroke-id-history';
+
+let state = {
+  password: '',
+  enrollSamples: [],
+  profile: null,
+  history: []
+};
+
+function showTab(name) {
+  ['enroll','auth','fingerprint'].forEach(t => {
+    document.getElementById('view-'+t).style.display = (t===name) ? 'block' : 'none';
+    document.getElementById('tab-'+t).classList.toggle('active', t===name);
+  });
+  if (name === 'fingerprint') renderFingerprints();
+}
+
+async function loadState() {
+  try {
+    const p = await window.storage.get('profile-data');
+    if (p && p.value) {
+      const parsed = JSON.parse(p.value);
+      state.password = parsed.password || '';
+      state.profile = parsed.profile || null;
+      state.history = parsed.history || [];
+    }
+  } catch(e) {}
+  if (state.password) {
+    document.getElementById('enroll-password-display').value = state.password;
+  }
+  if (state.profile) {
+    document.getElementById('enroll-status-dot').style.background = '#5B8C7B';
+    document.getElementById('enroll-status-text').textContent = 'Profile learned (' + state.profile.n + ' samples) — try Authenticate';
+    document.getElementById('enroll-input').disabled = false;
+    document.getElementById('enroll-input').placeholder = 'Profile complete — re-type to re-train, or switch to Authenticate';
+    renderDots(5,5);
+  }
+  renderDriftLog();
+}
+
+async function saveState() {
+  try {
+    await window.storage.set('profile-data', JSON.stringify({
+      password: state.password,
+      profile: state.profile,
+      history: state.history
+    }), false);
+  } catch(e) { console.error('save failed', e); }
+}
+
+function renderDots(filled, total) {
+  const el = document.getElementById('enroll-dots');
+  el.innerHTML = '';
+  for (let i=0; i<total; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i < filled ? ' filled' : '');
+    el.appendChild(d);
+  }
+}
+renderDots(0,5);
+
+document.getElementById('enroll-password-display').addEventListener('input', (e) => {
+  state.password = e.target.value;
+  const ready = state.password.length >= 3;
+  document.getElementById('enroll-input').disabled = !ready;
+  document.getElementById('enroll-input').placeholder = ready ? 'Type your password here' : 'Choose a password at least 3 characters first';
+  document.getElementById('enroll-status-text').textContent = ready ? 'Ready — type it below 5 times' : 'Set a password above to begin';
+  document.getElementById('enroll-status-dot').style.background = ready ? '#C9A24A' : '#2A3040';
+});
+
+function captureTimings(inputEl, onComplete) {
+  let events = [];
+  let downTimes = {};
+  let startTime = null;
+
+  function reset() { events = []; downTimes = {}; startTime = null; }
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key.length !== 1 && e.key !== 'Backspace') return;
+    if (startTime === null) startTime = performance.now();
+    downTimes[e.key + '_' + inputEl.value.length] = performance.now();
+  });
+
+  inputEl.addEventListener('keyup', (e) => {
+    if (e.key.length !== 1) return;
+    const key = e.key + '_' + (inputEl.value.length - 1);
+    const downT = downTimes[key];
+    if (downT === undefined) return;
+    const upT = performance.now();
+    events.push({ key: e.key, down: downT - startTime, up: upT - startTime, dwell: upT - downT });
+  });
+
+  inputEl.addEventListener('input', () => {
+    if (inputEl.value === state.password) {
+      const result = computeVector(events);
+      onComplete(result);
+      reset();
+      inputEl.value = '';
+    } else if (inputEl.value.length === 0) {
+      reset();
+    }
+  });
+}
+
+function computeVector(events) {
+  if (events.length < 2) return null;
+  const dwells = events.map(e => e.dwell);
+  const flights = [];
+  for (let i=1; i<events.length; i++) {
+    flights.push(events[i].down - events[i-1].up);
+  }
+  return { dwells, flights, totalTime: events[events.length-1].up - events[0].down };
+}
+
+function vectorToFeatureArray(v) {
+  return [...v.dwells, ...v.flights.map(f => Math.max(f, 0))];
+}
+
+function cosineSim(a, b) {
+  const len = Math.min(a.length, b.length);
+  if (len === 0) return 0;
+  let dot=0, magA=0, magB=0;
+  for (let i=0; i<len; i++) {
+    dot += a[i]*b[i];
+    magA += a[i]*a[i];
+    magB += b[i]*b[i];
+  }
+  if (magA===0 || magB===0) return 0;
+  return dot / (Math.sqrt(magA)*Math.sqrt(magB));
+}
+
+function buildProfile(samples) {
+  const n = samples.length;
+  const len = samples[0].dwells.length;
+  const flen = samples[0].flights.length;
+  const meanDwells = new Array(len).fill(0);
+  const meanFlights = new Array(flen).fill(0);
+  samples.forEach(s => {
+    s.dwells.forEach((d,i) => meanDwells[i] += d/n);
+    s.flights.forEach((f,i) => meanFlights[i] += Math.max(f,0)/n);
+  });
+  return { dwells: meanDwells, flights: meanFlights, n: n };
+}
+
+const enrollInput = document.getElementById('enroll-input');
+captureTimings(enrollInput, (vec) => {
+  if (!vec) return;
+  state.enrollSamples.push(vec);
+  renderDots(state.enrollSamples.length, 5);
+  document.getElementById('enroll-status-dot').style.background = '#C9A24A';
+  document.getElementById('enroll-status-text').textContent = state.enrollSamples.length + ' / 5 samples captured';
+
+  if (state.enrollSamples.length >= 5) {
+    state.profile = buildProfile(state.enrollSamples);
+    state.history = [];
+    document.getElementById('enroll-status-dot').style.background = '#5B8C7B';
+    document.getElementById('enroll-status-text').textContent = 'Profile learned — switch to Authenticate to test it';
+    enrollInput.disabled = true;
+    enrollInput.placeholder = 'Profile complete';
+    saveState();
+  }
+});
+
+function resetEnrollment() {
+  state.password = '';
+  state.profile = null;
+  state.enrollSamples = [];
+  state.history = [];
+  document.getElementById('enroll-password-display').value = '';
+  enrollInput.value = '';
+  enrollInput.disabled = true;
+  enrollInput.placeholder = 'Choose a password at least 3 characters first';
+  document.getElementById('enroll-status-text').textContent = 'Set a password above to begin';
+  document.getElementById('enroll-status-dot').style.background = '#2A3040';
+  renderDots(0,5);
+  document.getElementById('drift-panel').style.display = 'none';
+  saveState();
+}
+
+const authInput = document.getElementById('auth-input');
+captureTimings(authInput, (vec) => {
+  if (!vec || !state.profile) {
+    document.getElementById('auth-score').textContent = '—';
+    document.getElementById('auth-status-text').textContent = 'No profile enrolled yet';
+    return;
+  }
+  const profileVec = vectorToFeatureArray(state.profile);
+  const sampleVec = vectorToFeatureArray(vec);
+  const sim = cosineSim(profileVec, sampleVec);
+  const score = Math.round(Math.max(0, Math.min(1, sim)) * 100);
+
+  const scoreEl = document.getElementById('auth-score');
+  const dotEl = document.getElementById('auth-status-dot');
+  const textEl = document.getElementById('auth-status-text');
+  scoreEl.textContent = score + '%';
+
+  let verdict;
+  if (score >= 82) {
+    scoreEl.style.color = '#5B8C7B';
+    dotEl.className = 'status-dot ok';
+    textEl.textContent = 'Unlocked';
+    verdict = 'unlocked';
+    const updated = state.profile.dwells.map((d,i) => d*0.85 + vec.dwells[i]*0.15);
+    const updatedF = state.profile.flights.map((f,i) => f*0.85 + Math.max(vec.flights[i],0)*0.15);
+    state.profile.dwells = updated;
+    state.profile.flights = updatedF;
+  } else if (score >= 60) {
+    scoreEl.style.color = '#C9A24A';
+    dotEl.className = 'status-dot warn';
+    textEl.textContent = 'Borderline — re-enter';
+    verdict = 'borderline';
+  } else {
+    scoreEl.style.color = '#C4604A';
+    dotEl.className = 'status-dot bad';
+    textEl.textContent = 'Blocked — rhythm mismatch';
+    verdict = 'blocked';
+  }
+
+  state.history.unshift({ score, verdict, time: new Date().toLocaleTimeString(), vec });
+  state.history = state.history.slice(0, 8);
+  renderDriftLog();
+  saveState();
+});
+
+function renderDriftLog() {
+  const panel = document.getElementById('drift-panel');
+  const log = document.getElementById('drift-log');
+  if (state.history.length === 0) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  log.innerHTML = '';
+  state.history.forEach(h => {
+    const row = document.createElement('div');
+    const badge = h.verdict === 'unlocked' ? 'ok' : 'bad';
+    row.innerHTML = '<span>' + h.time + '</span><span class="badge ' + badge + '">' + h.score + '% match</span>';
+    log.appendChild(row);
+  });
+}
+
+function drawFingerprint(svgEl, dwells, flights, color, opacity, dashed) {
+  const cx = 160, cy = 160, maxR = 118, minR = 26;
+  const values = [...dwells, ...flights.map(f => Math.max(f,0))];
+  if (values.length === 0) return null;
+  const maxVal = Math.max(...values, 1);
+  const n = values.length;
+  const points = values.map((v, i) => {
+    const angle = (i / n) * Math.PI * 2 - Math.PI/2;
+    const r = minR + (v / maxVal) * (maxR - minR);
+    return [cx + r*Math.cos(angle), cy + r*Math.sin(angle), angle];
+  });
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+
+  const pathData = points.map((p,i) => (i===0?'M':'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ' Z';
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d', pathData);
+  path.setAttribute('fill', color + (opacity || '1a'));
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', '1.6');
+  path.setAttribute('stroke-linejoin', 'round');
+  if (dashed) path.setAttribute('stroke-dasharray', '5 4');
+  g.appendChild(path);
+
+  points.forEach(p => {
+    const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx', p[0]); dot.setAttribute('cy', p[1]);
+    dot.setAttribute('r', dashed ? '2.5' : '3');
+    dot.setAttribute('fill', color);
+    g.appendChild(dot);
+  });
+
+  svgEl.appendChild(g);
+  return { points, maxVal };
+}
+
+function renderFingerprints() {
+  const svg = document.getElementById('fp-overlay');
+  const readout = document.getElementById('fp-readout');
+  svg.innerHTML = '';
+  readout.innerHTML = '';
+
+  if (!state.profile) {
+    svg.innerHTML = '<text x="160" y="160" text-anchor="middle" fill="#5C5A52" font-size="12" font-family="JetBrains Mono, monospace">not enrolled yet</text>';
+    readout.innerHTML = '<div class="fp-row"><span class="fp-key">status</span><span class="fp-val">no profile</span></div>';
+    return;
+  }
+
+  const cx = 160, cy = 160, maxR = 118, minR = 26;
+  const n = state.profile.dwells.length + state.profile.flights.length;
+  const labels = [];
+  for (let i=0; i<state.profile.dwells.length; i++) labels.push('hold ' + (i+1));
+  for (let i=0; i<state.profile.flights.length; i++) labels.push('gap ' + (i+1));
+
+  for (let ring=1; ring<=3; ring++) {
+    const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circ.setAttribute('cx', cx); circ.setAttribute('cy', cy);
+    circ.setAttribute('r', minR + (maxR-minR)*ring/3);
+    circ.setAttribute('fill', 'none');
+    circ.setAttribute('stroke', '#1A1F2A');
+    circ.setAttribute('stroke-width', '1');
+    if (ring < 3) circ.setAttribute('stroke-dasharray', '2 3');
+    svg.appendChild(circ);
+  }
+
+  for (let i=0; i<n; i++) {
+    const angle = (i/n) * Math.PI*2 - Math.PI/2;
+    const x2 = cx + maxR*Math.cos(angle), y2 = cy + maxR*Math.sin(angle);
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    line.setAttribute('stroke', '#171C25');
+    line.setAttribute('stroke-width', '1');
+    svg.appendChild(line);
+
+    const lx = cx + (maxR+14)*Math.cos(angle), ly = cy + (maxR+14)*Math.sin(angle);
+    const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x', lx); txt.setAttribute('y', ly);
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('dominant-baseline', 'middle');
+    txt.setAttribute('font-size', '8.5');
+    txt.setAttribute('font-family', 'JetBrains Mono, monospace');
+    txt.setAttribute('fill', '#52504A');
+    txt.textContent = labels[i] || '';
+    svg.appendChild(txt);
+  }
+
+  drawFingerprint(svg, state.profile.dwells, state.profile.flights, '#5B8C7B', '22', false);
+
+  let latestInfo = null;
+  if (state.history.length > 0) {
+    const latest = state.history[0];
+    const color = latest.verdict === 'unlocked' ? '#5B8C7B' : '#C9A24A';
+    drawFingerprint(svg, latest.vec.dwells, latest.vec.flights, color, '0d', true);
+    latestInfo = latest;
+  }
+
+  const centerLabel = document.createElementNS('http://www.w3.org/2000/svg','text');
+  centerLabel.setAttribute('x', cx); centerLabel.setAttribute('y', cy - 4);
+  centerLabel.setAttribute('text-anchor', 'middle');
+  centerLabel.setAttribute('font-size', '9');
+  centerLabel.setAttribute('font-family', 'JetBrains Mono, monospace');
+  centerLabel.setAttribute('fill', '#3A3833');
+  centerLabel.textContent = state.profile.n + ' samples';
+  svg.appendChild(centerLabel);
+
+  const maxDwell = Math.max(...state.profile.dwells);
+  const maxFlight = Math.max(...state.profile.flights, 0);
+  readout.innerHTML =
+    '<div class="fp-row"><span class="fp-key">slowest hold</span><span class="fp-val">' + Math.round(maxDwell) + ' ms</span></div>' +
+    '<div class="fp-row"><span class="fp-key">longest gap</span><span class="fp-val">' + Math.round(maxFlight) + ' ms</span></div>' +
+    '<div class="fp-row"><span class="fp-key">keys tracked</span><span class="fp-val">' + n + '</span></div>' +
+    (latestInfo
+      ? '<div class="fp-row"><span class="fp-key">last match</span><span class="fp-val">' + latestInfo.score + '%</span></div>'
+      : '<div class="fp-row"><span class="fp-key">last match</span><span class="fp-val">no attempts</span></div>');
+}
+
+loadState();
+</script>
+</body>
+</html>
