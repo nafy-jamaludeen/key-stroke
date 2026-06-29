@@ -1,6 +1,6 @@
 Keystroke ID
 
-A working prototype of behavioral biometric authentication — it checks not just what password you type, but how you type it.
+A working prototype of behavioral biometric authentication it checks not just what password you type, but how you type it.
 
 What it does
 
